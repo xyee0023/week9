@@ -1,0 +1,66 @@
+<html>
+  <head>
+    <title>AI Index Map</title>
+    <script src="https://cdn.jsdelivr.net/npm/vega@5"></script>
+    <script src="https://cdn.jsdelivr.net/npm/vega-lite@5"></script>
+    <script src="https://cdn.jsdelivr.net/npm/vega-embed@6"></script>
+  </head>
+  <body>
+    <!-- Div where the map will be rendered -->
+    <div id="map"></div>
+
+    <!-- Vega-Lite Script -->
+    <script>
+      var mapSpec = {
+        "$schema": "https://vega.github.io/schema/vega-lite/v5.json",
+        "title": "AI Index by Country",
+        "width": 900,
+        "height": 500,
+        "projection": {"type": "equalEarth"},
+        "data": {
+          "url": "ne_110m.json",  // Path to your TopoJSON file
+          "format": {"type": "topojson", "feature": "ne_110m_admin_0_countries"}
+        },
+        "transform": [
+          {
+            // Lookup the AI Index score from your CSV file for all countries
+            "lookup": "properties.NAME",
+            "from": {
+              "data": {
+                "url": "AI_index_db.csv"  // Path to your CSV file
+              },
+              "key": "Country",  // Ensure the CSV has a column 'Country'
+              "fields": ["Score"]  // Replace 'Score' with the actual column name if needed
+            }
+          },
+          {
+            // Calculate the adjusted score, with a fallback value if the score is missing
+            "calculate": "datum['Score'] !== null ? datum['Score'] : 0.0",
+            "as": "Adjusted Score"
+          }
+        ],
+        "mark": {"type": "geoshape"},
+        "encoding": {
+          "color": {
+            "condition": {
+              "test": "datum['Adjusted Score'] === 0",
+              "value": "lightgrey"  // Set grey color for countries with score 0
+            },
+            "field": "Adjusted Score",
+            "type": "quantitative",
+            "scale": {"scheme": "blues"}  // Default color scheme for other scores
+          },
+          "tooltip": [
+            {"field": "properties.NAME", "type": "nominal", "title": "Country"},
+            {"field": "Adjusted Score", "type": "quantitative", "title": "AI Score"}
+          ]
+        }
+      };
+
+      vegaEmbed('#map', mapSpec).then(function(result) {
+        // The map is rendered here
+        console.log(result.view.data('source_0'));  // Log data for debugging
+      }).catch(console.error);
+    </script>
+  </body>
+</html>
