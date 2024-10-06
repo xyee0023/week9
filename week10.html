@@ -1,0 +1,426 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Index Visualization - Combined Map and Radar Chart</title>
+    <script src="https://cdn.jsdelivr.net/npm/vega@5"></script>
+    <script src="https://cdn.jsdelivr.net/npm/vega-lite@5"></script>
+    <script src="https://cdn.jsdelivr.net/npm/vega-embed@6"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/d3/5.16.0/d3.min.js"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+        }
+        .container {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 20px;
+        }
+        .visualization {
+            flex: 1;
+        }
+        #map, #radar-chart {
+            margin: 20px;
+        }
+        .filters {
+            margin: 20px;
+        }
+        .filter-label {
+            font-weight: bold;
+            margin-right: 10px;
+        }
+        #legend {
+            margin: 20px;
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+    <h1>AI Index Visualization - Combined Map and Radar Chart</h1>
+
+<!-- Map Container -->
+    <div class="map-container">
+        <!-- Cluster Filter (above map) -->
+        <div class="map-filters">
+            <label class="filter-label" for="cluster">Cluster:</label>
+            <select id="cluster" onchange="updateMap()">
+                <option value="All">All</option>
+                <option value="Power players">Power players</option>
+                <option value="Traditional champions">Traditional champions</option>
+                <option value="Rising stars">Rising stars</option>
+                <option value="Waking up">Waking up</option>
+                <option value="Nascent">Nascent</option>
+            </select>
+        </div>
+        <!-- Map Visualization -->
+        <div id="map" class="visualization" style="height: 500px;"></div>
+    </div>
+
+    <!-- Radar Container -->
+    <div class="radar-container">
+        <!-- Radar Filters (above radar chart) -->
+        <div class="radar-filters">
+            <label class="filter-label" for="country1">Select Country 1: </label>
+            <select id="country1"></select>
+            <label class="filter-label" for="country2">Select Country 2: </label>
+            <select id="country2"></select>
+        </div>
+        <div id="legend">Color Legend: </div>
+        <!-- Radar Chart Visualization -->
+        <div id="radar-chart" class="visualization" style="height: 600px;"></div>
+    </div>
+
+    <!-- Combined Vega Scripts -->
+    <script>
+        // Define a fixed color mapping for each country
+        const countryColorMapping = {
+            "United States of America": "#1f77b4", "China": "#ff7f0e", "United Kingdom": "#2ca02c",
+            "Canada": "#d62728", "Israel": "#9467bd", "Singapore": "#8c564b", "South Korea": "#e377c2",
+            "The Netherlands": "#7f7f7f", "Germany": "#bcbd22", "France": "#17becf", "Australia": "#393b79",
+            "Ireland": "#637939", "Finland": "#8c6d31", "Denmark": "#843c39", "Luxembourg": "#7b4173",
+            "Japan": "#ce6dbd", "India": "#de9ed6", "Switzerland": "#7b7b7b", "Sweden": "#bcbd22",
+            "Hong Kong": "#d6616b", "Spain": "#e7969c", "Austria": "#e7cb94", "Estonia": "#ad494a",
+            "Taiwan": "#d6616b", "Norway": "#a55194", "Saudi Arabia": "#e377c2", "Belgium": "#ff9896",
+            "Poland": "#98df8a", "Slovenia": "#c7c7c7", "New Zealand": "#ff7f0e", "Italy": "#8ca252",
+            "Russia": "#17becf", "Malta": "#aec7e8", "United Arab Emirates": "#2ca02c", "Portugal": "#c5b0d5",
+            "Czech Republic": "#9467bd", "Iceland": "#8c6d31", "Lithuania": "#bd9e39", "Brazil": "#e7ba52",
+            "Greece": "#bd9e39", "Slovakia": "#e7969c", "Hungary": "#e7cb94", "Malaysia": "#843c39",
+            "Mexico": "#ad494a", "Chile": "#7b4173", "Argentina": "#d6616b", "Qatar": "#ff9896",
+            "Turkey": "#17becf", "Colombia": "#bcbd22", "Uruguay": "#c49c94", "Bahrain": "#dbdb8d",
+            "Vietnam": "#c7c7c7", "Indonesia": "#9edae5", "Tunisia": "#17becf", "South Africa": "#1f77b4",
+            "Morocco": "#aec7e8", "Armenia": "#ff7f0e", "Sri Lanka": "#ffbb78", "Egypt": "#c49c94",
+            "Kenya": "#e377c2", "Nigeria": "#f7b6d2", "Pakistan": "#bcbd22"
+        };
+
+        // Map specification
+        var mapSpec = {
+            "$schema": "https://vega.github.io/schema/vega-lite/v5.json",
+            "title": "AI Index by Country",
+            "width": 900,
+            "height": 500,
+            "projection": {"type": "equalEarth"},
+            "data": {
+                "url": "ne_110m.json",  // Path to your TopoJSON file
+                "format": {"type": "topojson", "feature": "ne_110m_admin_0_countries"}
+            },
+            "transform": [
+                {
+                    // Lookup the AI Index score and additional attributes from your CSV file for all countries
+                    "lookup": "properties.NAME",
+                    "from": {
+                        "data": {
+                            "url": "AI_index_db.csv"  // Path to your CSV file
+                        },
+                        "key": "Country",  // Ensure the CSV has a column 'Country'
+                        "fields": ["Score", "Cluster"]  // Include the 'Cluster' column to filter
+                    }
+                },
+                
+                {
+                    // Initially, set Adjusted Score to the AI Score or 0 if it's missing
+                    "calculate": "datum['Score'] !== null ? datum['Score'] : 0.0",
+                    "as": "Adjusted Score"
+                }
+            ],
+            "layer": [
+                {
+                    "mark": {"type": "geoshape"},
+                    "encoding": {
+                        "color": {
+                            "condition": {
+                                "test": "datum['Adjusted Score'] === 0",
+                                "value": "lightgrey"  // Set grey color for countries with score 0
+                            },
+                            "field": "Adjusted Score",
+                            "type": "quantitative",
+                            "scale": {"scheme": "blues"}  // Default color scheme for other scores
+                        },
+                        "tooltip": [
+                            {"field": "properties.NAME", "type": "nominal", "title": "Country"},
+                            {"field": "Adjusted Score", "type": "quantitative", "title": "AI Score"},
+                            {"field": "Cluster", "type": "nominal", "title": "Cluster"}
+                        ]
+                    }
+                },
+                {
+                // Add annotations layer positioned in the ocean area
+                "data": {
+                    "values": [
+                        // Position labels in the ocean near the respective countries
+                        {"Country": "United States", "Latitude": 35.0, "Longitude": -54.0, "Label": "AI Superpower: USA"},  // West of the USA in the Pacific Ocean
+                        {"Country": "China", "Latitude": 30.0, "Longitude": 145.0, "Label": "AI Superpower: China"},  // East of China in the Pacific Ocean
+                        {"Country": "United Kingdom", "Latitude": 49.0, "Longitude": -30.0, "Label": "AI Superpower: UK"}  // West of the UK in the Atlantic Ocean
+                    ]
+                },
+                "mark": {"type": "text", "fontSize": 10, "fontWeight": "bold", "color": "black"},
+                "encoding": {
+                    "longitude": {"field": "Longitude", "type": "quantitative"},
+                    "latitude": {"field": "Latitude", "type": "quantitative"},
+                    "text": {"field": "Label"},
+                }
+            }
+
+            ]
+        };
+
+        // Radar chart specification
+        var radarSpec = {
+            "$schema": "https://vega.github.io/schema/vega/v5.json",
+            "description": "A radar chart showing AI capabilities for selected countries.",
+            "width": 500,
+            "height": 500,
+            "padding": 80,
+            "autosize": {"type": "none", "contains": "padding"},
+            "signals": [
+                {"name": "radius", "update": "width / 2"}
+            ],
+            "data": [
+                {
+                    "name": "table",
+                    "url": "AI_index_db.csv",
+                    "format": {"type": "csv"},
+                    "transform": [
+                        {"type": "filter", "expr": "datum.Country == 'China' || datum.Country == 'United States of America'"},
+                        {
+                            "type": "fold",
+                            "fields": [
+                                "Talent", 
+                                "Infrastructure", 
+                                "Operating Environment", 
+                                "Research", 
+                                "Government Strategy", 
+                                "Commercial", 
+                                "Development"
+                            ],
+                            "as": ["key", "value"]
+                        },
+                        {"type": "identifier", "as": "category"}
+                    ]
+                },
+                {
+                    "name": "keys",
+                    "source": "table",
+                    "transform": [
+                        {
+                            "type": "aggregate",
+                            "groupby": ["key"]
+                        }
+                    ]
+                }
+            ],
+            "scales": [
+                {
+                    "name": "angular",
+                    "type": "point",
+                    "range": {"signal": "[-PI, PI]"},
+                    "padding": 0.5,
+                    "domain": {"data": "table", "field": "key"}
+                },
+                {
+                    "name": "radial",
+                    "type": "linear",
+                    "range": {"signal": "[0, radius]"},
+                    "zero": true,
+                    "nice": false,
+                    "domain": {"data": "table", "field": "value"},
+                    "domainMin": 0
+                },
+                {
+                    "name": "color",
+                    "type": "ordinal",
+                    "domain": Object.keys(countryColorMapping),
+                    "range": Object.values(countryColorMapping)
+                }
+            ],
+            "encode": {
+                "enter": {
+                    "x": {"signal": "radius"},
+                    "y": {"signal": "radius"}
+                }
+            },
+            "marks": [
+                {
+                    "type": "group",
+                    "name": "categories",
+                    "zindex": 1,
+                    "from": {
+                        "facet": {"data": "table", "name": "facet", "groupby": ["Country"]}
+                    },
+                    "marks": [
+                        {
+                            "type": "line",
+                            "name": "category-line",
+                            "from": {"data": "facet"},
+                            "encode": {
+                                "enter": {
+                                    "interpolate": {"value": "linear-closed"},
+                                    "x": {"signal": "scale('radial', datum.value) * cos(scale('angular', datum.key))"},
+                                    "y": {"signal": "scale('radial', datum.value) * sin(scale('angular', datum.key))"},
+                                    "stroke": {"scale": "color", "field": "Country"},
+                                    "strokeWidth": {"value": 2},
+                                    "fill": {"scale": "color", "field": "Country"},
+                                    "fillOpacity": {"value": 0.1},
+                                    "tooltip": {"signal": "{'Country': datum.Country, 'Category': datum.key, 'Value': datum.value}"}
+                                }
+                            }
+                        },
+                        // Add circles at each data point to ensure tooltips are triggered correctly
+                        {
+                            "type": "symbol",
+                            "name": "category-points",
+                            "from": {"data": "facet"},
+                            "encode": {
+                                "enter": {
+                                    "x": {"signal": "scale('radial', datum.value) * cos(scale('angular', datum.key))"},
+                                    "y": {"signal": "scale('radial', datum.value) * sin(scale('angular', datum.key))"},
+                                    "size": {"value": 100},
+                                    "fill": {"scale": "color", "field": "Country"},
+                                    "fillOpacity": {"value": 1},
+                                    "tooltip": {"signal": "{'Country': datum.Country, 'Category': datum.key, 'Value': datum.value}"}
+                                }
+                            }
+                        }
+                    ]
+                },
+                {
+                    "type": "rule",
+                    "name": "radial-grid",
+                    "from": {"data": "keys"},
+                    "zindex": 0,
+                    "encode": {
+                        "enter": {
+                            "x": {"value": 0},
+                            "y": {"value": 0},
+                            "x2": {"signal": "radius * cos(scale('angular', datum.key))"},
+                            "y2": {"signal": "radius * sin(scale('angular', datum.key))"},
+                            "stroke": {"value": "lightgray"},
+                            "strokeWidth": {"value": 1}
+                        }
+                    }
+                },
+                {
+                    "type": "text",
+                    "name": "key-label",
+                    "from": {"data": "keys"},
+                    "zindex": 1,
+                    "encode": {
+                        "enter": {
+                            "x": {"signal": "(radius + 20) * cos(scale('angular', datum.key))"},
+                            "y": {"signal": "(radius + 20) * sin(scale('angular', datum.key))"},
+                            "text": {"field": "key"},
+                            "align": [
+                                {
+                                    "test": "abs(scale('angular', datum.key)) > PI / 2",
+                                    "value": "right"
+                                },
+                                {
+                                    "value": "left"
+                                }
+                            ],
+                            "baseline": [
+                                {
+                                    "test": "scale('angular', datum.key) > 0", "value": "top"
+                                },
+                                {
+                                    "test": "scale('angular', datum.key) == 0", "value": "middle"
+                                },
+                                {
+                                    "value": "bottom"
+                                }
+                            ],
+                            "fill": {"value": "black"},
+                            "fontWeight": {"value": "bold"}
+                        }
+                    }
+                }
+            ]
+        };
+
+        // Render the initial visualizations
+        vegaEmbed('#map', mapSpec).then(function(result) {
+            window.vegaView = result.view;
+        }).catch(console.error);
+
+        vegaEmbed('#radar-chart', radarSpec).then(function(result) {
+            window.radarView = result.view;
+            updateLegend(["China", "United States of America"]);
+        }).catch(console.error);
+
+        // Populate the dropdowns dynamically from the CSV data
+        vega.loader().load('AI_index_db.csv').then(function(data) {
+            const csv = d3.csvParse(data);
+            const uniqueCountries = Array.from(new Set(csv.map(d => d['Country'])));
+            var country1Dropdown = document.getElementById('country1');
+            var country2Dropdown = document.getElementById('country2');
+
+            uniqueCountries.forEach(country => {
+                var option1 = document.createElement("option");
+                option1.value = country;
+                option1.text = country;
+                country1Dropdown.appendChild(option1);
+
+                var option2 = document.createElement("option");
+                option2.value = country;
+                option2.text = country;
+                country2Dropdown.appendChild(option2);
+            });
+
+            country1Dropdown.value = 'China';
+            country2Dropdown.value = 'United States of America';
+            country1Dropdown.addEventListener('change', applyFilter);
+            country2Dropdown.addEventListener('change', applyFilter);
+        }).catch(console.error);
+
+        // Function to update the radar chart based on selected countries
+        function applyFilter() {
+            var selectedCountry1 = document.getElementById("country1").value;
+            var selectedCountry2 = document.getElementById("country2").value;
+
+            radarSpec.data[0].transform[0] = {
+                "type": "filter",
+                "expr": "datum.Country == '" + selectedCountry1 + "' || datum.Country == '" + selectedCountry2 + "'"
+            };
+
+            vegaEmbed('#radar-chart', radarSpec).then(function(result) {
+                window.radarView = result.view;
+                updateLegend([selectedCountry1, selectedCountry2]);
+            }).catch(console.error);
+        }
+
+        function updateLegend(selectedCountries) {
+            var legendDiv = document.getElementById("legend");
+            legendDiv.innerHTML = "Color Legend: ";
+            selectedCountries.forEach(country => {
+                var countryLabel = document.createElement("div");
+                countryLabel.style.display = "inline-block";
+                countryLabel.style.marginRight = "15px";
+                countryLabel.style.color = countryColorMapping[country];
+                countryLabel.innerHTML = `&#9679; ${country}`;
+                legendDiv.appendChild(countryLabel);
+            });
+        }
+
+        // Function to update the map based on selected cluster filter
+        function updateMap() {
+            var selectedCluster = document.getElementById("cluster").value;
+
+            if (selectedCluster !== "All") {
+                mapSpec.transform[1] = {
+                    "calculate": "datum['Cluster'] === '" + selectedCluster + "' ? datum['Score'] : 0.0",
+                    "as": "Adjusted Score"
+                };
+            } else {
+                mapSpec.transform[1] = {
+                    "calculate": "datum['Score'] !== null ? datum['Score'] : 0.0",
+                    "as": "Adjusted Score"
+                };
+            }
+
+            vegaEmbed('#map', mapSpec).then(function(result) {
+                window.vegaView = result.view;
+            }).catch(console.error);
+        }
+    </script>
+</body>
+</html>
