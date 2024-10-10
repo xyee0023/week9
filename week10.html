@@ -68,7 +68,15 @@
         </div>
         <div id="legend">Color Legend: </div>
         <!-- Radar Chart Visualization -->
-        <div id="radar-chart" class="visualization" style="height: 600px;"></div>
+        <div id="radar-chart" class="visualization" style="height: 500px;"></div>
+    </div>
+
+    <!-- bubble chart and grouped bar chart container -->
+    <div class="container">
+        <!-- Bubble Chart Container -->
+        <div id="bubble-chart" class="visualization" style="height: 500px;"></div>
+        <!-- Grouped Bar Chart Container -->
+        <div id="grouped-bar-chart" class="visualization" style="height: 500px;"></div>
     </div>
 
     <!-- Combined Vega Scripts -->
@@ -337,6 +345,210 @@
             ]
         };
 
+        var barSpec = {
+            "$schema": "https://vega.github.io/schema/vega-lite/v5.json",
+            "description": "Grouped Bar Chart showing AI Adoption Level by Industry with Number of Companies, including annotations.",
+            "width": 600,  // Adjust width here
+            "height": 350,  // Adjust height here
+            "data": {
+                "url": "ai_job_market_insights.csv",  // Path to your CSV file
+                "format": {"type": "csv"}  // Specify CSV format
+            },
+            "transform": [
+                // Aggregation transform to count the number of companies by Industry and AI Adoption Level
+                {"aggregate": [{"op": "count", "as": "Count"}], "groupby": ["Industry", "AI_Adoption_Level"]}
+            ],
+            "layer": [
+                {
+                    "mark": "bar",
+                    "encoding": {
+                        "x": {"field": "Industry", "type": "nominal", "axis": {"title": "Industry"}},
+                        "y": {"field": "Count", "type": "quantitative", "axis": {"title": "Number of Companies"}},
+                        "xOffset": {"field": "AI_Adoption_Level", "sort": ["High", "Medium", "Low"]},
+                        "color": {
+                            "field": "AI_Adoption_Level",
+                            "type": "nominal",
+                            "scale": {
+                                "domain": ["High", "Medium", "Low"],
+                                "range": ["#1f77b4", "#ff7f0e", "#2ca02c"]  // Custom colors for High, Medium, Low
+                            },
+                            "legend": {"title": "AI Adoption Level"}
+                        },
+                        "tooltip": [
+                            {"field": "Industry", "type": "nominal", "title": "Industry"},
+                            {"field": "AI_Adoption_Level", "type": "nominal", "title": "AI Adoption Level"},
+                            {"field": "Count", "type": "quantitative", "title": "Number of Companies"}
+                        ]
+                    }
+                },
+                // Add annotation text for Healthcare industry
+                {
+                "layer": [
+                    // First line of the Healthcare annotation text
+                    {
+                        "mark": {
+                            "type": "text",
+                            "align": "left",
+                            "baseline": "middle",
+                            "dx": -80,
+                            "dy": -90,
+                            "fontSize": 12,
+                            // "fontWeight": "bold",
+                            "color": "black"
+                        },
+                        "encoding": {
+                            "x": {"datum": "Healthcare"},
+                            "y": {"datum": 17},
+                            "text": {"value": "Healthcare is the only industry"}
+                        }
+                    },
+                    // Second line of the Healthcare annotation text
+                    {
+                        "mark": {
+                            "type": "text",
+                            "align": "left",
+                            "baseline": "middle",
+                            "dx": -80,
+                            "dy": -75,  // Adjust dy to place below the first line
+                            "fontSize": 12,
+                            // "fontWeight": "bold",
+                            "color": "black"
+                        },
+                        "encoding": {
+                            "x": {"datum": "Healthcare"},
+                            "y": {"datum": 17},
+                            "text": {"value": "where High AI adoption > Medium/Low"}
+                        }
+                    }
+                ]
+            },
+
+
+                // Add annotation text for Technology industry
+                {
+            "layer": [
+                // First line of text
+                {
+                    "mark": {
+                        "type": "text",
+                        "align": "left",
+                        "baseline": "middle",
+                        "dx": -80,
+                        "dy": 15,
+                        "fontSize": 12,
+                        // "fontWeight": "bold",
+                        "color": "black"
+                    },
+                    "encoding": {
+                        "x": {"datum": "Technology"},
+                        "y": {"datum": 31},
+                        "text": {"value": "High proportion of companies in"}
+                    }
+                },
+                // Second line of text
+                {
+                    "mark": {
+                        "type": "text",
+                        "align": "left",
+                        "baseline": "middle",
+                        "dx": -80,
+                        "dy": 30,  // Adjust 'dy' to position below the first line
+                        "fontSize": 12,
+                        // "fontWeight": "thin",
+                        "color": "black"
+                    },
+                    "encoding": {
+                        "x": {"datum": "Technology"},
+                        "y": {"datum": 31},
+                        "text": {"value": "Technology are at Medium AI adoption"}
+                    }
+                }
+            ]
+        },
+
+            ],
+            "config": {
+                "axis": {
+                    "labelFontSize": 12,
+                    "titleFontSize": 14
+                },
+                "legend": {
+                    "labelFontSize": 12,
+                    "titleFontSize": 14
+                }
+            }
+        };
+
+        var bubbleSpec = {
+            "$schema": "https://vega.github.io/schema/vega-lite/v5.json",
+            "description": "Bubble Plot of Salary (in thousands) vs Company Size with AI Adoption Level determining bubble size.",
+            "width": 600,  // Adjust width here
+            "height": 400,  // Adjust height here
+            "data": {
+                "url": "ai_job_market_insights.csv",  // Path to your CSV file
+                "format": {"type": "csv"}  // Specify CSV format
+            },
+            "mark": "circle",
+            "transform": [
+                // Optional: Convert salary to 'k' units for better readability
+                {"calculate": "datum.Salary_USD / 1000", "as": "Salary_k"},  
+                // Create a formatted salary field for tooltip
+                {"calculate": "'$' + format(datum.Salary_k, '.1f') + 'k'", "as": "Formatted_Salary"}, 
+            ],
+            "encoding": {
+                "x": {
+                    "field": "Salary_k",
+                    "type": "quantitative",
+                    "axis": {
+                        "title": "Average salary (in thousands)",
+                        "format": ".1f"
+                    },
+                    "scale": {"domain": [30, 160]}  // Adjust the domain to fit data
+                },
+                "y": {
+                    "field": "Company_Size",
+                    "type": "nominal",
+                    "axis": {"title": "Company Size"},
+                    "sort": ["Large", "Medium", "Small"]  // Sorting the company size categories
+                },
+                "size": {
+                    "field": "AI_Adoption_Level",
+                    "type": "nominal",
+                    "scale": {
+                        "domain": ["High", "Medium", "Low"],
+                        "range": [500, 100, 20]  // Adjust the bubble sizes for Low, Medium, and High
+                    },
+                    "legend": {"title": "AI Adoption Level"}
+                },
+                "color": {
+                    "field": "AI_Adoption_Level",
+                    "type": "nominal",
+                    "scale": {
+                        "domain": ["High", "Medium", "Low"],
+                        "range": ["#1f77b4", "#ff7f0e", "#2ca02c"]  // Custom colors for AI adoption levels 
+                    },
+                    "legend": {"title": "AI Adoption Level"}
+                },
+                "tooltip": [
+                    {"field": "Formatted_Salary", "type": "nominal", "title": "Salary (USD)"},
+                    {"field": "Company_Size", "type": "nominal", "title": "Company Size"},
+                    {"field": "AI_Adoption_Level", "type": "nominal", "title": "AI Adoption Level"},
+                    {"field": "Location", "type": "nominal", "title": "Location"}  // Add other fields if needed
+                ]
+            },
+            "config": {
+                "axis": {
+                    "labelFontSize": 12,
+                    "titleFontSize": 14
+                },
+                "legend": {
+                    "labelFontSize": 12,
+                    "titleFontSize": 14
+                }
+            }
+        };
+
+
         // Render the initial visualizations
         vegaEmbed('#map', mapSpec).then(function(result) {
             window.vegaView = result.view;
@@ -346,6 +558,17 @@
             window.radarView = result.view;
             updateLegend(["China", "United States of America"]);
         }).catch(console.error);
+
+        // Embed the bubble chart
+        vegaEmbed('#bubble-chart', bubbleSpec).then(function(result) {
+            console.log("Bubble chart rendered successfully.");
+        }).catch(console.error);
+
+        // Embed the grouped bar chart
+        vegaEmbed('#grouped-bar-chart', barSpec).then(function(result) {
+            console.log("Grouped bar chart rendered successfully.");
+        }).catch(console.error);
+
 
         // Populate the dropdowns dynamically from the CSV data
         vega.loader().load('AI_index_db.csv').then(function(data) {
